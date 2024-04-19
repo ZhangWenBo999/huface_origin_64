@@ -10,7 +10,7 @@
         "tb_logger": "tb_logger", // path of tensorboard logger
         "results": "results",
         "checkpoint": "checkpoint",
-        "resume_state": "/kaggle/input/o64-28000-750/750" 
+        "resume_state": "/kaggle/input/o64-28000-800/800" 
         // "resume_state": null // ex: 100, loading .state  and .pth from given epoch and iteration
     },
 
@@ -133,7 +133,7 @@
     },
 
     "train": { // arguments for basic training
-        "n_epoch": 800, // max epochs, not limited now
+        "n_epoch": 1000, // max epochs, not limited now
         "n_iter": 1e8, // max interations
         "val_epoch": 10, // valdation every specified number of epochs
         "save_checkpoint_epoch": 10,
