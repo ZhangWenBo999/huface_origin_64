@@ -2,7 +2,7 @@ import os
 from abc import abstractmethod
 from functools import partial
 import collections
-
+import shutil
 import torch
 import torch.nn as nn
 
@@ -63,6 +63,21 @@ class BaseModel():
                     val_log = self.val_step()
                     for key, value in val_log.items():
                         self.logger.info('{:5s}: {}\t'.format(str(key), value))
+                        if val_log['val/mae'] < self.opt['train']['min_val_mae_loss']:
+                            self.opt['train']['min_val_flag'] = True
+                            path = self.opt['path']['checkpoint'] + '\\best'
+                            if not os.path.exists(path):
+                                best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
+                                os.makedirs(best_path, exist_ok=True)
+                            else:
+                                shutil.rmtree(path)
+                                best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
+                                os.makedirs(best_path, exist_ok=True)
+
+                            self.opt['train']['min_val_mae_loss'] = val_log['val/mae']
+                            self.epoch = str(self.epoch) + '_best'
+                            self.save_everything()
+                            self.epoch = int(self.epoch.split('_', 1)[0])
                 self.logger.info("\n------------------------------Validation End------------------------------\n\n")
         self.logger.info('Number of Epochs has reached the limit, End.')
 
@@ -96,8 +111,12 @@ class BaseModel():
         """ save network structure, only work on GPU 0 """
         if self.opt['global_rank'] !=0:
             return
-        save_filename = '{}_{}.pth'.format(self.epoch, network_label)
-        save_path = os.path.join(self.opt['path']['checkpoint'], save_filename)
+        if self.opt['train']['min_val_flag']:
+            save_filename = '{}_{}.pth'.format(self.epoch, network_label)
+            save_path = os.path.join(self.opt['path']['checkpoint'], 'best', save_filename)
+        else:
+            save_filename = '{}_{}.pth'.format(self.epoch, network_label)
+            save_path = os.path.join(self.opt['path']['checkpoint'], save_filename)
         if isinstance(network, nn.DataParallel) or isinstance(network, nn.parallel.DistributedDataParallel):
             network = network.module
         state_dict = network.state_dict()
@@ -133,8 +152,13 @@ class BaseModel():
             state['schedulers'].append(s.state_dict())
         for o in self.optimizers:
             state['optimizers'].append(o.state_dict())
-        save_filename = '{}.state'.format(self.epoch)
-        save_path = os.path.join(self.opt['path']['checkpoint'], save_filename)
+        if self.opt['train']['min_val_flag']:
+            self.opt['train']['min_val_flag'] = False
+            save_filename = '{}.state'.format(self.epoch)
+            save_path = os.path.join(self.opt['path']['checkpoint'], 'best', save_filename)
+        else:
+            save_filename = '{}.state'.format(self.epoch)
+            save_path = os.path.join(self.opt['path']['checkpoint'], save_filename)
         torch.save(state, save_path)
 
     def resume_training(self):
