@@ -22,7 +22,8 @@
                     "data_root": "datasets/celebahq/flist/dualx_64_local.flist",
                     "data_len": -1,
                     "mask_config": {
-                        "mask_mode": "hybrid"
+                        "mask_mode": "hybrid",
+                        "phase": "train"
                     }
                 }
             },
@@ -50,7 +51,8 @@
                 "args":{
                     "data_root": "datasets/celebahq/flist/dualx_64_local.flist",
                     "mask_config": {
-                        "mask_mode": "center"
+                        "mask_mode": "center",
+                        "phase": "test"
                     }
                 }
             },
