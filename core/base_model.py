@@ -5,7 +5,10 @@ import collections
 import shutil
 import torch
 import torch.nn as nn
+import time
 
+import matplotlib.pyplot as plt
+import numpy as np
 
 import core.util as Util
 CustomResult = collections.namedtuple('CustomResult', 'name result')
@@ -36,14 +39,17 @@ class BaseModel():
         self.results_dict = CustomResult([],[]) # {"name":[], "result":[]}
 
     def train(self):
-        while self.epoch <= self.opt['train']['n_epoch'] and self.iter <= self.opt['train']['n_iter']:
+        start_time = time.time()
+        train_mse_losses = []
+        eval_mae_losses = []
+        while self.epoch < self.opt['train']['n_epoch'] and self.iter <= self.opt['train']['n_iter']:
             self.epoch += 1
             if self.opt['distributed']:
                 ''' sets the epoch for this sampler. When :attr:`shuffle=True`, this ensures all replicas use a different random ordering for each epoch '''
                 self.phase_loader.sampler.set_epoch(self.epoch) 
             self.opt["datasets"]["train"]["which_dataset"]["args"]["mask_config"]["phase"] = "train"
             train_log = self.train_step()
-
+            train_mse_losses.append(train_log['train/mse_loss'])
             ''' save logged informations into log dict ''' 
             train_log.update({'epoch': self.epoch, 'iters': self.iter})
 
@@ -51,35 +57,86 @@ class BaseModel():
             for key, value in train_log.items():
                 self.logger.info('{:5s}: {}\t'.format(str(key), value))
             
-            if self.epoch % self.opt['train']['save_checkpoint_epoch'] == 0:
-                self.logger.info('Saving the self at the end of epoch {:.0f}'.format(self.epoch))
+            if self.epoch == self.opt['train']['n_epoch'] or (time.time() - start_time >= 42600):
+                # self.logger.info('Saving the self at the end of epoch {:.0f}'.format(self.epoch))
                 self.save_everything()
 
             if self.epoch % self.opt['train']['val_epoch'] == 0:
-                self.logger.info("\n\n\n------------------------------Validation Start------------------------------")
+                # self.logger.info("\n\n\n------------------------------Validation Start------------------------------")
                 if self.val_loader is None:
                     self.logger.warning('Validation stop where dataloader is None, Skip it.')
                 else:
                     self.opt["datasets"]["train"]["which_dataset"]["args"]["mask_config"]["phase"] = "eval"
                     val_log = self.val_step()
+                    eval_mae_losses.append(val_log['val/mae'].to('cpu').tolist())
+
                     for key, value in val_log.items():
                         self.logger.info('{:5s}: {}\t'.format(str(key), value))
+                        # 保存最好的checkpoint
                         if val_log['val/mae'] < self.opt['train']['min_val_mae_loss']:
                             self.opt['train']['min_val_flag'] = True
                             path = self.opt['path']['checkpoint'] + '\\best'
-                            if not os.path.exists(path):
-                                best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
-                                os.makedirs(best_path, exist_ok=True)
-                            else:
+
+                            if os.path.exists(path):
                                 shutil.rmtree(path)
-                                best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
-                                os.makedirs(best_path, exist_ok=True)
+                            best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
+                            os.makedirs(best_path, exist_ok=True)
+
+                            # if not os.path.exists(path):
+                            #     best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
+                            #     os.makedirs(best_path, exist_ok=True)
+                            # else:
+                            #     shutil.rmtree(path)
+                            #     best_path = os.path.join(self.opt['path']['checkpoint'], 'best')
+                            #     os.makedirs(best_path, exist_ok=True)
 
                             self.opt['train']['min_val_mae_loss'] = val_log['val/mae']
                             self.epoch = str(self.epoch) + '_best'
                             self.save_everything()
                             self.epoch = int(self.epoch.split('_', 1)[0])
-                self.logger.info("\n------------------------------Validation End------------------------------\n\n")
+
+                        if self.epoch == self.opt['train']['n_epoch']:
+                            # 到达指定轮数，保存checkpoint 并 画图
+                            plt.figure()
+                            plt.title('Train Curve')
+
+                            # 去除顶部和右边的框
+                            ax = plt.gca()
+                            ax.spines['right'].set_color('none')
+                            ax.spines['top'].set_color('none')
+
+                            # 设置x和y轴的标签
+                            plt.xlabel('epochs')
+                            plt.ylabel('train_losses')
+
+                            epochs = np.arange(len(train_mse_losses))
+                            plt.plot(epochs, train_mse_losses)
+
+                            # 保存训练损失图
+                            save_path = os.path.join(self.opt['path']['checkpoint'], 'best', 'train_losses.png')
+                            plt.savefig(save_path)
+
+                            plt.figure()
+                            plt.title('Eval Curve')
+
+                            # 去除顶部和右边的框
+                            ax = plt.gca()
+                            ax.spines['right'].set_color('none')
+                            ax.spines['top'].set_color('none')
+
+                            # 设置x和y轴的标签
+                            plt.xlabel('epochs')
+                            plt.ylabel('eval_losses')
+
+                            epochs = np.arange(len(eval_mae_losses))
+                            plt.plot(epochs, eval_mae_losses)
+
+                            # 保存验证损失图
+                            save_path = os.path.join(self.opt['path']['checkpoint'], 'best', 'eval_losses.png')
+                            plt.savefig(save_path)
+
+                            plt.show()
+                # self.logger.info("\n------------------------------Validation End------------------------------\n\n")
         self.logger.info('Number of Epochs has reached the limit, End.')
 
     def test(self):
