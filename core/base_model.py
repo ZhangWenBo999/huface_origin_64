@@ -96,6 +96,8 @@ class BaseModel():
                             self.epoch = int(self.epoch.split('_', 1)[0])
 
                         if self.epoch == self.opt['train']['n_epoch'] or (time.time() - start_time >= 42600):
+                            self.opt['train']['train_previous'].extend(train_mse_losses)
+                            self.opt['train']['eval_previous'].extend(eval_mae_losses)
                             # 到达指定轮数，保存checkpoint 并 画图
                             plt.figure()
                             plt.title('Train Curve')
@@ -109,8 +111,8 @@ class BaseModel():
                             plt.xlabel('epochs')
                             plt.ylabel('train_losses')
 
-                            epochs = np.arange(len(train_mse_losses))
-                            plt.plot(epochs, train_mse_losses)
+                            epochs = np.arange(len(self.opt['train']['train_previous']))
+                            plt.plot(epochs, self.opt['train']['train_previous'])
 
                             # 保存训练损失图
                             save_path = os.path.join(self.opt['path']['checkpoint'], 'best', 'train_losses.png')
@@ -128,14 +130,16 @@ class BaseModel():
                             plt.xlabel('epochs')
                             plt.ylabel('eval_losses')
 
-                            epochs = np.arange(len(eval_mae_losses))
-                            plt.plot(epochs, eval_mae_losses)
+                            epochs = np.arange(len(self.opt['train']['eval_previous']))
+                            plt.plot(epochs, self.opt['train']['eval_previous'])
 
                             # 保存验证损失图
                             save_path = os.path.join(self.opt['path']['checkpoint'], 'best', 'eval_losses.png')
                             plt.savefig(save_path)
 
                             plt.show()
+                            self.logger.info('train_last: {}\t'.format(self.opt['train']['train_previous']))
+                            self.logger.info('eval_last: {}\t'.format(self.opt['train']['eval_previous']))
                 # self.logger.info("\n------------------------------Validation End------------------------------\n\n")
         self.logger.info('Number of Epochs has reached the limit, End.')
 

@@ -135,14 +135,16 @@
     },
 
     "train": { // arguments for basic training
-        "n_epoch": 11, // max epochs, not limited now
+        "n_epoch": 3, // max epochs, not limited now
         "n_iter": 1e8, // max interations
         "val_epoch": 1, // valdation every specified number of epochs
         "save_checkpoint_epoch": 10,
         "log_iter": 1e3, // log every specified number of iterations
         "tensorboard" : false,  // tensorboardX enable
         "min_val_mae_loss": 1e3,
-        "min_val_flag": false
+        "min_val_flag": false,
+        "train_previous": [],
+        "eval_previous": []
     },
 
     "debug": { // arguments in debug mode, which will replace arguments in train
