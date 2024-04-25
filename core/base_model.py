@@ -95,7 +95,7 @@ class BaseModel():
                             self.save_everything()
                             self.epoch = int(self.epoch.split('_', 1)[0])
 
-                        if self.epoch == self.opt['train']['n_epoch']:
+                        if self.epoch == self.opt['train']['n_epoch'] or (time.time() - start_time >= 42600):
                             # 到达指定轮数，保存checkpoint 并 画图
                             plt.figure()
                             plt.title('Train Curve')
